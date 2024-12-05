@@ -1,0 +1,98 @@
+App.js
+
+import React from "react";
+import PaginationWithPageNumbers from "./PaginationWithPageNumbers";
+
+const App = () => {
+  const items = Array.from({ length: 100 }, (_, i) => `Item ${i + 1}`);
+  const itemsPerPage = 10;
+
+  const handlePageChange = (page) => {
+    console.log(`Loading data for page ${page}...`);
+    // Simulate API fetch or other operations
+  };
+
+  return (
+    <div>
+      <PaginationWithPageNumbers
+        items={items}
+        itemsPerPage={itemsPerPage}
+        onChangePage={handlePageChange}
+      />
+    </div>
+  );
+};
+
+export default App;
+
+_________________________________________________________________________________________________________
+
+import React, { useState } from "react";
+
+const PaginationWithPageNumbers = ({ items, itemsPerPage, onChangePage }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Calculate total pages
+  const totalPages = Math.ceil(items.length / itemsPerPage);
+
+  // Get current items for the page
+  const currentItems = items.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    onChangePage(page); // Notify parent component
+  };
+
+  return (
+    <div>
+      <h2>Pagination</h2>
+
+      {/* Display current items */}
+      <ul>
+        {currentItems.map((item, index) => (
+          <li key={index}>{item}</li>
+        ))}
+      </ul>
+
+      {/* Pagination Controls */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          Previous
+        </button>
+
+        {/* Page Numbers */}
+        {Array.from({ length: totalPages }, (_, index) => (
+          <button
+            key={index}
+            onClick={() => handlePageChange(index + 1)}
+            style={{
+              padding: "5px 10px",
+              backgroundColor: currentPage === index + 1 ? "#007bff" : "#fff",
+              color: currentPage === index + 1 ? "#fff" : "#000",
+              border: "1px solid #ddd",
+              cursor: "pointer",
+            }}
+          >
+            {index + 1}
+          </button>
+        ))}
+
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default PaginationWithPageNumbers;
