@@ -10,8 +10,8 @@ const App = () => {
     { id: "6", message: "This is message number 5", notification: "Type 3", mark: "bad", status: "active" },
     { id: "7", message: "This is message number 5", notification: "Type 3", mark: "good", status: "inactive" },
     { id: "8", message: "This is message number 5", notification: "Type 4", mark: "bad", status: "active" },
-    { id: "9", message: "This is message number 6", notification: "Type 4", mark: "good", status: "active" },
-    { id: "10", message: "This is message number 7", notification: "Type 4", mark: "good", status: "active" },
+    { id: "9", message: "Another message number 6", notification: "Type 4", mark: "good", status: "active" },
+    { id: "10", message: "Yet another message number 7", notification: "Type 4", mark: "good", status: "active" },
   ];
 
   const [searchText, setSearchText] = useState(""); // For search filter
@@ -20,6 +20,7 @@ const App = () => {
   const [showActiveOnly, setShowActiveOnly] = useState(false); // For status filter
   const [currentPage, setCurrentPage] = useState(1); // For pagination
   const [itemsPerPage, setItemsPerPage] = useState(3); // Items per page
+  const [sortType, setSortType] = useState(""); // Sort type (alphabetical or relevance)
 
   // Filter data based on all active filters
   const filteredData = data.filter((item) => {
@@ -33,10 +34,22 @@ const App = () => {
     return matchesSearch && matchesNotification && matchesMark && matchesStatus;
   });
 
+  // Sorting logic
+  const sortedData = [...filteredData].sort((a, b) => {
+    if (sortType === "alphabetical") {
+      return a.message.localeCompare(b.message);
+    } else if (sortType === "relevance" && searchText) {
+      const aIncludes = a.message.toLowerCase().includes(searchText.toLowerCase());
+      const bIncludes = b.message.toLowerCase().includes(searchText.toLowerCase());
+      return bIncludes - aIncludes; // Show relevant results first
+    }
+    return 0; // No sorting
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+  const currentData = sortedData.slice(startIndex, startIndex + itemsPerPage);
 
   // Handlers for pagination
   const goToNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages));
@@ -51,7 +64,7 @@ const App = () => {
 
   return (
     <div style={{ padding: "20px" }}>
-      <h1>Notification Filters with Pagination</h1>
+      <h1>Notification Filters with Sorting and Pagination</h1>
 
       {/* Search Input */}
       <div>
@@ -111,6 +124,18 @@ const App = () => {
         </label>
       </div>
 
+      {/* Sort Dropdown */}
+      <div>
+        <label>
+          Sort by:{" "}
+          <select value={sortType} onChange={(e) => setSortType(e.target.value)}>
+            <option value="">None</option>
+            <option value="alphabetical">Alphabetical</option>
+            <option value="relevance">Relevance</option>
+          </select>
+        </label>
+      </div>
+
       {/* Items per page */}
       <div>
         <label>
@@ -124,7 +149,7 @@ const App = () => {
         </label>
       </div>
 
-      {/* Filtered Data Display */}
+      {/* Filtered and Sorted Data Display */}
       <h2>Filtered Notifications</h2>
       <ul>
         {currentData.length > 0 ? (
