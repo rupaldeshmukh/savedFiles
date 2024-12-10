@@ -1,0 +1,90 @@
+import React, { useState } from "react";
+
+const initialData = [
+  { id: "1", message: "This is message number 1", notification: "Type 1", mark: "good", status: "active" },
+  { id: "2", message: "This is message number 2", notification: "Type 1", mark: "bad", status: "active" },
+  { id: "3", message: "This is message number 3", notification: "Type 2", mark: "good", status: "inactive" },
+  { id: "4", message: "This is message number 4", notification: "Type 1", mark: "bad", status: "active" },
+  { id: "5", message: "This is message number 5", notification: "Type 3", mark: "average", status: "inactive" },
+  { id: "6", message: "This is message number 5", notification: "Type 3", mark: "bad", status: "active" },
+  { id: "7", message: "This is message number 5", notification: "Type 3", mark: "good", status: "inactive" },
+  { id: "8", message: "This is message number 5", notification: "Type 4", mark: "bad", status: "active" },
+];
+
+function CheckboxSelectionWithSelectAll() {
+  const [selectedData, setSelectedData] = useState([]);
+
+  // Handle individual checkbox change
+  const handleCheckboxChange = (item) => {
+    setSelectedData((prevSelected) => {
+      const exists = prevSelected.some((selectedItem) => selectedItem.id === item.id);
+      if (exists) {
+        // Remove the item if it is already selected
+        return prevSelected.filter((selectedItem) => selectedItem.id !== item.id);
+      } else {
+        // Add the item if it is not already selected
+        return [...prevSelected, { id: item.id, message: item.message, notification: item.notification }];
+      }
+    });
+  };
+
+  // Handle "Select All" checkbox
+  const handleSelectAll = (isChecked) => {
+    if (isChecked) {
+      // Add all items to selectedData
+      setSelectedData(
+        initialData.map((item) => ({
+          id: item.id,
+          message: item.message,
+          notification: item.notification,
+        }))
+      );
+    } else {
+      // Clear all selected items
+      setSelectedData([]);
+    }
+  };
+
+  // Check if "Select All" checkbox should be checked
+  const isAllSelected = selectedData.length === initialData.length;
+
+  return (
+    <div>
+      <h3>Checkbox Selection with "Select All"</h3>
+
+      {/* Select All Checkbox */}
+      <div style={{ marginBottom: "10px" }}>
+        <label>
+          <input
+            type="checkbox"
+            onChange={(e) => handleSelectAll(e.target.checked)}
+            checked={isAllSelected}
+          />
+          Select All
+        </label>
+      </div>
+
+      {/* Individual Checkboxes */}
+      <ul>
+        {initialData.map((item) => (
+          <li key={item.id} style={{ marginBottom: "10px" }}>
+            <label>
+              <input
+                type="checkbox"
+                onChange={() => handleCheckboxChange(item)}
+                checked={selectedData.some((selectedItem) => selectedItem.id === item.id)}
+              />
+              {item.message} - {item.notification}
+            </label>
+          </li>
+        ))}
+      </ul>
+
+      {/* Display Selected Data */}
+      <h4>Selected Data:</h4>
+      <pre>{JSON.stringify(selectedData, null, 2)}</pre>
+    </div>
+  );
+}
+
+export default CheckboxSelectionWithSelectAll;
