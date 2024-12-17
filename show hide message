@@ -1,0 +1,45 @@
+<div class="clamp-text-container">
+  <div class="clamp-text">
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam vehicula, urna sed interdum pulvinar, mauris nisl placerat augue, sit amet vehicula libero sapien id nisl. Sed id sapien lorem.
+  </div>
+  <span class="see-more" onclick="toggleText(this)">... see more</span>
+</div>
+
+
+# css
+.clamp-text-container {
+  position: relative;
+  display: inline-block;
+}
+
+.clamp-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* Number of lines to show */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.see-more {
+  color: #e20074; /* Your preferred color for "see more" */
+  cursor: pointer;
+  font-weight: bold;
+}
+# function toggle
+
+function toggleText(button) {
+  const container = button.parentElement;
+  const textBlock = container.querySelector(".clamp-text");
+
+  if (button.textContent.trim() === "... see more") {
+    // Expand text
+    textBlock.style.display = "block";
+    textBlock.style.webkitLineClamp = "none";
+    button.textContent = " see less";
+  } else {
+    // Collapse text
+    textBlock.style.display = "-webkit-box";
+    textBlock.style.webkitLineClamp = 2; // Clamp back to 2 lines
+    button.textContent = "... see more";
+  }
+}
