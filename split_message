@@ -1,0 +1,35 @@
+import React from "react";
+
+const DynamicMessageWithLink = ({ response }) => {
+  // Extract message and type from the response
+  const { message, type } = response;
+
+  // Function to wrap the `type` with a clickable link
+  const renderMessageWithLink = (message, type) => {
+    if (!message || !type) return message;
+
+    // Split message into parts before and after the `type`
+    const parts = message.split(type);
+
+    return (
+      <>
+        {parts[0]}
+        <a
+          href={`/details/${type}`} // Dynamic link for the type
+          style={{ color: "#e20074", textDecoration: "underline" }}
+        >
+          {type}
+        </a>
+        {parts[1]}
+      </>
+    );
+  };
+
+  return (
+    <div>
+      <p>{renderMessageWithLink(message, type)}</p>
+    </div>
+  );
+};
+
+export default DynamicMessageWithLink;
