@@ -1,44 +1,59 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
-const LineClampWithSeeMore = ({ text, maxLines = 2 }) => {
-  const [expanded, setExpanded] = useState(false); // State to toggle between expanded/collapsed
+const LineClampWithShowMore = ({ text, maxLines = 2 }) => {
+  const [isOverflowing, setIsOverflowing] = useState(false); // Checks if text exceeds 2 lines
+  const [expanded, setExpanded] = useState(false); // Toggles between expanded/collapsed
+  const textRef = useRef(null); // Reference to measure the text container
 
-  // Toggle text expansion
-  const toggleExpanded = () => {
-    setExpanded(!expanded);
-  };
+  useEffect(() => {
+    // Measure if the text exceeds the clamped height
+    const checkOverflow = () => {
+      if (textRef.current) {
+        const maxHeight = parseFloat(getComputedStyle(textRef.current).lineHeight) * maxLines;
+        setIsOverflowing(textRef.current.scrollHeight > maxHeight);
+      }
+    };
 
-  // Styles for the clamped text
+    checkOverflow();
+    window.addEventListener("resize", checkOverflow); // Re-check on window resize
+    return () => window.removeEventListener("resize", checkOverflow);
+  }, [text, maxLines]);
+
+  // Styles for clamped text
   const clampStyle = {
     display: "-webkit-box",
-    WebkitLineClamp: expanded ? "unset" : maxLines, // Unset the clamp when expanded
+    WebkitLineClamp: expanded ? "unset" : maxLines,
     WebkitBoxOrient: "vertical",
     overflow: expanded ? "visible" : "hidden",
     textOverflow: "ellipsis",
-    lineHeight: "1.5em", // Adjust line height
-    maxHeight: expanded ? "none" : `${1.5 * maxLines}em`, // Ensure height matches the clamping
+    lineHeight: "1.5em", // Adjust as per your design
+    maxHeight: expanded ? "none" : `${1.5 * maxLines}em`,
   };
 
   return (
     <div style={{ position: "relative", width: "300px" }}> {/* Adjust width as needed */}
-      <span style={clampStyle}>{text}</span>
-      <span
-        onClick={toggleExpanded}
-        style={{
-          color: "#e20074", // Link color
-          cursor: "pointer",
-          fontWeight: "bold",
-          position: "absolute",
-          bottom: 0,
-          right: 0,
-          backgroundColor: "white", // Optional: Matches the background for clear readability
-          paddingLeft: "5px",
-        }}
-      >
-        {expanded ? " see less" : "... see more"}
+      <span ref={textRef} style={clampStyle}>
+        {text}
       </span>
+      {isOverflowing && ( // Show "show more" only if text overflows
+        <span
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            color: "#e20074",
+            cursor: "pointer",
+            fontWeight: "bold",
+            position: "absolute",
+            bottom: 0,
+            right: 0,
+            backgroundColor: "white",
+            paddingLeft: "5px",
+          }}
+        >
+          {expanded ? " show less" : "... show more"}
+        </span>
+      )}
     </div>
   );
 };
 
-export default LineClampWithSeeMore;
+export default LineClampWithShowMore;
