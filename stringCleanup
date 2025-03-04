@@ -1,0 +1,10 @@
+const data = [
+  { "name": "Azure Databricks"},
+  { "name": "  Azure-Databricks"},
+  { "name": "azure-databricks"}
+]
+
+  data.map(item => 
+console.log(item.name.replace(/\s+|-/g, "").toLowerCase())        
+  )
+
