@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Dropdown, FormControl } from "react-bootstrap";
+import { Dropdown, FormControl, Badge, CloseButton } from "react-bootstrap";
 import axios from "axios";
 
 const FilterDropdown = ({ label = "Select Options" }) => {
@@ -28,7 +28,7 @@ const FilterDropdown = ({ label = "Select Options" }) => {
 
   const handleItemClick = (item) => {
     setSelectedItems((prev) => {
-      const exists = prev.find((i) => i.id === item.id);
+      const exists = prev.find((i) => i.ID === item.ID);
       if (exists) return prev;
       return [...prev, item];
     });
@@ -36,9 +36,9 @@ const FilterDropdown = ({ label = "Select Options" }) => {
     setData([]);
   };
 
-  const formattedSelection = selectedItems
-    .map((item) => `${item.name}>${item.id}`)
-    .join(", ");
+  const handleRemoveItem = (id) => {
+    setSelectedItems((prev) => prev.filter((item) => item.ID !== id));
+  };
 
   return (
     <div className="m-2">
@@ -57,15 +57,24 @@ const FilterDropdown = ({ label = "Select Options" }) => {
           />
           {data.map((item, idx) => (
             <Dropdown.Item key={idx} onClick={() => handleItemClick(item)}>
-              {item.name}
+              {item.name} ({item.ID})
             </Dropdown.Item>
           ))}
         </Dropdown.Menu>
       </Dropdown>
 
       {selectedItems.length > 0 && (
-        <div className="mt-2">
-          <strong>Selected:</strong> {formattedSelection}
+        <div className="mt-2 d-flex flex-wrap gap-2">
+          {selectedItems.map((item) => (
+            <Badge key={item.ID} bg="secondary" className="d-flex align-items-center">
+              {item.name} &gt; {item.ID}
+              <CloseButton
+                onClick={() => handleRemoveItem(item.ID)}
+                className="ms-2"
+                variant="white"
+              />
+            </Badge>
+          ))}
         </div>
       )}
     </div>
