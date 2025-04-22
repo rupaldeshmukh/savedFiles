@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Dropdown, FormControl, Badge, CloseButton } from "react-bootstrap";
 import axios from "axios";
 
@@ -6,6 +6,7 @@ const FilterDropdown = ({ label = "Select Options" }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [data, setData] = useState([]);
   const [query, setQuery] = useState("");
+  const inputRef = useRef(null);
 
   const fetchOptions = async (search) => {
     try {
@@ -33,7 +34,7 @@ const FilterDropdown = ({ label = "Select Options" }) => {
       return [...prev, item];
     });
     setQuery("");
-    setData([]);
+    setTimeout(() => inputRef.current?.focus(), 0); // keep focus for next input
   };
 
   const handleRemoveItem = (id) => {
@@ -42,29 +43,29 @@ const FilterDropdown = ({ label = "Select Options" }) => {
 
   return (
     <div className="m-2">
-      <Dropdown autoClose="outside">
-        <Dropdown.Toggle variant="primary" id="multi-select-dropdown">
-          {selectedItems.length > 0 ? `${selectedItems.length} selected` : label}
-        </Dropdown.Toggle>
-
-        <Dropdown.Menu style={{ maxHeight: "300px", overflowY: "auto", padding: "10px" }}>
-          <FormControl
-            type="text"
-            placeholder="Search..."
-            value={query}
-            onChange={handleInputChange}
-            className="mb-2"
-          />
-          {data.map((item, idx) => (
-            <Dropdown.Item key={idx} onClick={() => handleItemClick(item)}>
-              {item.name} ({item.ID})
-            </Dropdown.Item>
-          ))}
-        </Dropdown.Menu>
-      </Dropdown>
-
+      <div className="mb-2">
+        <FormControl
+          ref={inputRef}
+          type="text"
+          placeholder="Search..."
+          value={query}
+          onChange={handleInputChange}
+        />
+      </div>
+      <div className="border rounded p-2 mb-2" style={{ maxHeight: "200px", overflowY: "auto" }}>
+        {data.map((item, idx) => (
+          <div
+            key={idx}
+            className="dropdown-item cursor-pointer"
+            onClick={() => handleItemClick(item)}
+            style={{ cursor: "pointer" }}
+          >
+            {item.name} ({item.ID})
+          </div>
+        ))}
+      </div>
       {selectedItems.length > 0 && (
-        <div className="mt-2 d-flex flex-wrap gap-2">
+        <div className="d-flex flex-wrap gap-2">
           {selectedItems.map((item) => (
             <Badge key={item.ID} bg="secondary" className="d-flex align-items-center">
               {item.name} &gt; {item.ID}
