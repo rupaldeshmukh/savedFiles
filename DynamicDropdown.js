@@ -1,46 +1,54 @@
-import React, { useEffect, useState } from "react";
-import { Dropdown, ButtonGroup } from "react-bootstrap";
-import axios from "axios";
+import React, { useState } from "react";
+import { Dropdown, ButtonGroup, Badge, CloseButton } from "react-bootstrap";
 
-const DynamicDropdowns = () => {
-  const [filters, setFilters] = useState({});
+const SingleDropdownSelector = ({ options = [], label = "Select Option" }) => {
+  const [selected, setSelected] = useState([]);
 
-  useEffect(() => {
-    // Replace with your actual API endpoint
-    axios.get("/api/get-filters").then((res) => {
-      setFilters(res.data);
-    });
-  }, []);
+  const handleSelect = (value) => {
+    if (!selected.includes(value)) {
+      setSelected((prev) => [...prev, value]);
+    }
+  };
 
-  const renderDropdown = (filterKey, items) => {
-    const label = filterKey.charAt(0).toUpperCase() + filterKey.slice(1);
+  const handleRemove = (index) => {
+    setSelected((prev) => prev.filter((_, i) => i !== index));
+  };
 
-    return (
-      <Dropdown as={ButtonGroup} key={filterKey} className="m-2">
-        <Dropdown.Toggle variant="primary" id={`dropdown-${filterKey}`}>
+  const selectedCommaSeparated = selected.join(",");
+
+  return (
+    <div className="m-3">
+      <Dropdown as={ButtonGroup}>
+        <Dropdown.Toggle variant="primary">
           {label}
         </Dropdown.Toggle>
         <Dropdown.Menu>
-          {items.map((item, index) => {
-            const [key, value] = Object.entries(item)[0];
-            return (
-              <Dropdown.Item key={index} eventKey={value}>
-                {`${key}: ${value}`}
-              </Dropdown.Item>
-            );
-          })}
+          {options.map((val, idx) => (
+            <Dropdown.Item key={idx} onClick={() => handleSelect(val)}>
+              {val}
+            </Dropdown.Item>
+          ))}
         </Dropdown.Menu>
       </Dropdown>
-    );
-  };
 
-  return (
-    <div className="p-3 d-flex flex-wrap">
-      {Object.entries(filters).map(([filterKey, items]) =>
-        renderDropdown(filterKey, items)
-      )}
+      <div className="mt-3 d-flex flex-wrap gap-2">
+        {selected.map((val, idx) => (
+          <Badge key={idx} bg="secondary">
+            {val}
+            <CloseButton
+              onClick={() => handleRemove(idx)}
+              className="ms-1"
+            />
+          </Badge>
+        ))}
+      </div>
+
+      {/* Hidden input or preview */}
+      <div className="mt-3">
+        <strong>Final value:</strong> {selectedCommaSeparated || "None"}
+      </div>
     </div>
   );
 };
 
-export default DynamicDropdowns;
+export default SingleDropdownSelector;
