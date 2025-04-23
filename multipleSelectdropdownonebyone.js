@@ -13,6 +13,7 @@ const FilterDropdown = ({ label = "Select Options" }) => {
     try {
       const response = await axios.get(`/api/search-options?q=${search}`); // replace with actual API
       setData(response.data);
+      setShowDropdown(true);
     } catch (err) {
       console.error("Error fetching options:", err);
     }
@@ -25,6 +26,7 @@ const FilterDropdown = ({ label = "Select Options" }) => {
       fetchOptions(search);
     } else {
       setData([]);
+      setShowDropdown(false);
     }
   };
 
@@ -35,6 +37,8 @@ const FilterDropdown = ({ label = "Select Options" }) => {
       return [...prev, item];
     });
     setQuery("");
+    setData([]);
+    setShowDropdown(false);
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
@@ -64,17 +68,21 @@ const FilterDropdown = ({ label = "Select Options" }) => {
             placeholder={label}
             value={query}
             onChange={handleInputChange}
-            onClick={() => setShowDropdown(true)}
+            onClick={() => {
+              if (query.trim()) setShowDropdown(true);
+            }}
           />
         </Dropdown.Toggle>
 
-        <Dropdown.Menu style={{ maxHeight: "300px", overflowY: "auto", padding: "10px" }}>
-          {data.map((item, idx) => (
-            <Dropdown.Item key={idx} onClick={() => handleItemClick(item)}>
-              {item.name} ({item.ID})
-            </Dropdown.Item>
-          ))}
-        </Dropdown.Menu>
+        {data.length > 0 && (
+          <Dropdown.Menu style={{ maxHeight: "300px", overflowY: "auto", padding: "10px" }}>
+            {data.map((item, idx) => (
+              <Dropdown.Item key={idx} onClick={() => handleItemClick(item)}>
+                {item.name} ({item.ID})
+              </Dropdown.Item>
+            ))}
+          </Dropdown.Menu>
+        )}
       </Dropdown>
 
       {selectedItems.length > 0 && (
