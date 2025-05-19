@@ -11,26 +11,29 @@ const ImageUploader = ({ onFileSelect }) => {
   const handleFiles = (fileList) => {
     const newFiles = Array.from(fileList);
 
-    const validFiles = newFiles.filter(file =>
-      VALID_TYPES.includes(file.type)
-    );
+    const validFiles = newFiles.filter(file => VALID_TYPES.includes(file.type));
 
     if (validFiles.length !== newFiles.length) {
       alert("Only JPEG, PNG, BMP, and GIF files are allowed.");
       return;
     }
 
-    const currentSize = SelectedFiles.reduce((sum, f) => sum + f.size, 0);
-    const newSize = validFiles.reduce((sum, f) => sum + f.size, 0);
+    const totalSize = [...SelectedFiles, ...validFiles].reduce((sum, f) => sum + f.size, 0);
 
-    if (currentSize + newSize > MAX_TOTAL_SIZE) {
+    if (totalSize > MAX_TOTAL_SIZE) {
       alert("Total file size exceeds 30MB.");
       return;
     }
 
     const updatedFiles = [...SelectedFiles, ...validFiles];
     setSelectedFiles(updatedFiles);
-    setPreview(URL.createObjectURL(validFiles[validFiles.length - 1]));
+
+    const lastFile = validFiles[validFiles.length - 1];
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreview(reader.result);
+    };
+    reader.readAsDataURL(lastFile);
 
     if (onFileSelect) {
       onFileSelect(updatedFiles);
@@ -62,13 +65,15 @@ const ImageUploader = ({ onFileSelect }) => {
     const updatedFiles = SelectedFiles.filter((_, i) => i !== index);
     setSelectedFiles(updatedFiles);
 
-    // Update preview if removed file was last one
-    if (
-      preview &&
-      preview === URL.createObjectURL(SelectedFiles[index])
-    ) {
+    if (updatedFiles.length > 0) {
       const lastFile = updatedFiles[updatedFiles.length - 1];
-      setPreview(lastFile ? URL.createObjectURL(lastFile) : null);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result);
+      };
+      reader.readAsDataURL(lastFile);
+    } else {
+      setPreview(null);
     }
 
     if (onFileSelect) {
@@ -186,7 +191,6 @@ const ImageUploader = ({ onFileSelect }) => {
 };
 
 export default ImageUploader;
-
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>
   import React, { useState } from "react";
