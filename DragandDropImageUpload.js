@@ -5,45 +5,35 @@ const VALID_TYPES = ["image/jpeg", "image/png", "image/bmp", "image/gif"];
 
 const ImageUploader = ({ onFileSelect }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [SelectedFiles, setSelectedFiles] = useState([]);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [preview, setPreview] = useState(null);
 
-  const handleFiles = (fileList) => {
-    const newFiles = Array.from(fileList);
+  const handleFiles = (newFiles) => {
+    const validFiles = Array.from(newFiles).filter(file =>
+      VALID_TYPES.includes(file.type)
+    );
 
-    const validFiles = newFiles.filter(file => VALID_TYPES.includes(file.type));
-
-    if (validFiles.length !== newFiles.length) {
-      alert("Only JPEG, PNG, BMP, and GIF files are allowed.");
+    if (validFiles.length === 0) {
+      alert("Only jpeg, png, bmp, gif files allowed.");
       return;
     }
 
-    const totalSize = [...SelectedFiles, ...validFiles].reduce((sum, f) => sum + f.size, 0);
+    const totalSize = validFiles.reduce((sum, f) => sum + f.size, 0);
 
     if (totalSize > MAX_TOTAL_SIZE) {
       alert("Total file size exceeds 30MB.");
       return;
     }
 
-    const updatedFiles = [...SelectedFiles, ...validFiles];
-    setSelectedFiles(updatedFiles);
-
-    const lastFile = validFiles[validFiles.length - 1];
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result);
-    };
-    reader.readAsDataURL(lastFile);
-
-    if (onFileSelect) {
-      onFileSelect(updatedFiles);
-    }
+    setSelectedFiles(validFiles);
+    setPreview(URL.createObjectURL(validFiles[validFiles.length - 1]));
+    onFileSelect(validFiles);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setDragActive(false);
-    if (e.dataTransfer.files.length > 0) {
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFiles(e.dataTransfer.files);
     }
   };
@@ -61,129 +51,70 @@ const ImageUploader = ({ onFileSelect }) => {
     }
   };
 
-  const handleRemoveFile = (index) => {
-    const updatedFiles = SelectedFiles.filter((_, i) => i !== index);
-    setSelectedFiles(updatedFiles);
-
-    if (updatedFiles.length > 0) {
-      const lastFile = updatedFiles[updatedFiles.length - 1];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result);
-      };
-      reader.readAsDataURL(lastFile);
-    } else {
+  const handleRemove = (index) => {
+    const updated = selectedFiles.filter((_, i) => i !== index);
+    setSelectedFiles(updated);
+    onFileSelect(updated);
+    if (selectedFiles[index]?.preview === preview && updated.length > 0) {
+      setPreview(URL.createObjectURL(updated[updated.length - 1]));
+    } else if (updated.length === 0) {
       setPreview(null);
-    }
-
-    if (onFileSelect) {
-      onFileSelect(updatedFiles);
     }
   };
 
-  const handleClearAll = () => {
+  const handleRemoveAll = () => {
     setSelectedFiles([]);
     setPreview(null);
-    if (onFileSelect) {
-      onFileSelect([]);
-    }
+    onFileSelect([]);
   };
 
   return (
-    <div
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onClick={() => document.getElementById("fileInput").click()}
-      style={{
-        border: `2px dashed ${dragActive ? "#007bff" : "#ccc"}`,
-        borderRadius: "10px",
-        padding: "20px",
-        textAlign: "center",
-        cursor: "pointer",
-        background: "#f9f9f9",
-        position: "relative",
-      }}
-    >
-      <input
-        type="file"
-        id="fileInput"
-        accept={VALID_TYPES.join(",")}
-        onChange={handleChange}
-        multiple
-        style={{ display: "none" }}
-      />
-      <p>Click or drag images here to upload (max total 30MB)</p>
+    <div>
+      <div
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onClick={() => document.getElementById("fileInput").click()}
+        style={{
+          border: `2px dashed ${dragActive ? "#007bff" : "#ccc"}`,
+          borderRadius: "10px",
+          padding: "20px",
+          textAlign: "center",
+          cursor: "pointer",
+          background: "#f9f9f9",
+        }}
+      >
+        <input
+          type="file"
+          id="fileInput"
+          accept={VALID_TYPES.join(",")}
+          onChange={handleChange}
+          style={{ display: "none" }}
+          multiple
+        />
+        <p>Click or drag images here to upload (Max combined 30MB)</p>
+      </div>
 
       {preview && (
-        <div style={{ marginTop: "15px" }}>
-          <h4>Last Uploaded Preview:</h4>
-          <img
-            src={preview}
-            alt="Last Preview"
-            style={{
-              maxWidth: "100%",
-              maxHeight: "200px",
-              marginTop: "5px",
-              border: "1px solid #ddd",
-            }}
-          />
-        </div>
+        <img
+          src={preview}
+          alt="Preview"
+          style={{ maxWidth: "100%", marginTop: "10px" }}
+        />
       )}
 
-      {SelectedFiles.length > 0 && (
-        <div style={{ marginTop: "20px", textAlign: "left" }}>
-          <h4>Uploaded Files:</h4>
-          <ul style={{ listStyle: "none", paddingLeft: 0 }}>
-            {SelectedFiles.map((file, index) => (
-              <li
-                key={index}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  backgroundColor: "#f0f0f0",
-                  padding: "5px 10px",
-                  marginBottom: "5px",
-                  borderRadius: "5px",
-                }}
-              >
-                <span>{file.name}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveFile(index);
-                  }}
-                  style={{
-                    background: "transparent",
-                    color: "red",
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Remove
-                </button>
+      {selectedFiles.length > 0 && (
+        <div style={{ marginTop: "15px" }}>
+          <strong>Selected Files:</strong>
+          <ul>
+            {selectedFiles.map((file, index) => (
+              <li key={index} style={{ display: "flex", justifyContent: "space-between" }}>
+                {file.name}
+                <button onClick={() => handleRemove(index)}>Remove</button>
               </li>
             ))}
           </ul>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClearAll();
-            }}
-            style={{
-              marginTop: "10px",
-              backgroundColor: "#dc3545",
-              color: "white",
-              border: "none",
-              padding: "8px 12px",
-              borderRadius: "5px",
-              cursor: "pointer",
-            }}
-          >
-            Remove All
-          </button>
+          <button onClick={handleRemoveAll}>Remove All</button>
         </div>
       )}
     </div>
