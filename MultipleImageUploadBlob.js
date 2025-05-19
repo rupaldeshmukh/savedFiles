@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import axios from 'axios';
 
 const API_UPLOAD_URL = 'https://example.com/upload';
@@ -17,14 +17,11 @@ export default function FileUploader() {
 
   const bytesToMB = (bytes) => bytes / (1024 * 1024);
 
-  const handleFileChange = async (e) => {
-    const selectedFiles = Array.from(e.target.files);
+  const processFiles = async (files) => {
+    const validFiles = files.filter(file => ACCEPTED_TYPES.includes(file.type));
 
-    const validFiles = selectedFiles.filter(file => ACCEPTED_TYPES.includes(file.type));
-
-    if (validFiles.length !== selectedFiles.length) {
+    if (validFiles.length !== files.length) {
       alert('Only JPEG, PNG, BMP, and GIF files are allowed!');
-      e.target.value = '';
       return;
     }
 
@@ -33,7 +30,6 @@ export default function FileUploader() {
 
     if (bytesToMB(totalSize) > MAX_TOTAL_SIZE_MB) {
       alert('Total size exceeds 30MB!');
-      e.target.value = '';
       return;
     }
 
@@ -64,8 +60,24 @@ export default function FileUploader() {
       alert('Upload failed.');
     } finally {
       setIsLoading(false);
-      e.target.value = '';
     }
+  };
+
+  const handleFileChange = (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    processFiles(selectedFiles);
+    e.target.value = '';
+  };
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    if (isLoading) return;
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    processFiles(droppedFiles);
+  }, [isLoading, uploadedFiles]);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
   };
 
   const handleRemove = async (indexToRemove) => {
@@ -76,7 +88,7 @@ export default function FileUploader() {
 
       await axios.post(API_DELETE_URL, {
         blobUrls: [fileToRemove.blobUrl],
-        fileType: fileToRemove.type.split('/')[1], // e.g., 'jpeg'
+        fileType: fileToRemove.type.split('/')[1],
         publishId: PUBLISH_ID,
       }, {
         headers: {
@@ -100,7 +112,11 @@ export default function FileUploader() {
   };
 
   return (
-    <div className="p-4 max-w-md mx-auto border rounded shadow relative">
+    <div
+      className="p-4 max-w-md mx-auto border rounded shadow relative"
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+    >
       <h2 className="text-xl font-bold mb-4">Upload Image Files</h2>
 
       <input
@@ -111,6 +127,10 @@ export default function FileUploader() {
         disabled={isLoading}
         className="mb-4"
       />
+
+      <div className="mb-4 p-4 border-dashed border-2 border-gray-400 rounded text-center text-gray-500">
+        Drag & Drop images here
+      </div>
 
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-60 z-10">
