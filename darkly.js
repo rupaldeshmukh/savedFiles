@@ -1,107 +1,112 @@
-🧩 Folder Overview
-src/
- ├── App.js
- ├── authConfig.js       ← MSAL config
- ├── msalInstance.js     ← MSAL init
- ├── LaunchDarklyClient.js ← LD safe init (CORS-safe)
- └── index.js
-
-1️⃣ MSAL Setup (authConfig.js + msalInstance.js)
-// authConfig.js
+1️⃣ msalConfig.js
+// src/authConfig.js
 export const msalConfig = {
   auth: {
     clientId: "YOUR_MSAL_CLIENT_ID",
     authority: "https://login.microsoftonline.com/YOUR_TENANT_ID",
     redirectUri: "http://localhost:3000",
   },
+  cache: {
+    cacheLocation: "sessionStorage", // or "localStorage"
+  },
 };
 
-// msalInstance.js
+2️⃣ msalInstance.js
+// src/msalInstance.js
 import { PublicClientApplication } from "@azure/msal-browser";
 import { msalConfig } from "./authConfig";
 
 export const msalInstance = new PublicClientApplication(msalConfig);
 
-2️⃣ LaunchDarkly Safe Initialization (LaunchDarklyClient.js)
+3️⃣ LaunchDarklyClient.js — CORS-Safe Setup
 
-This is the key part.
-We’ll ensure LD requests don’t get CORS-blocked by skipping interceptors or wrapped fetches.
+This ensures LaunchDarkly SDK is initialized cleanly and not affected by MSAL or interceptors.
 
-// LaunchDarklyClient.js
+// src/LaunchDarklyClient.js
 import { initialize } from "launchdarkly-js-client-sdk";
 
-// optional: if Axios or global fetch adds auth headers, bypass them
+/**
+ * Prevent Axios or custom fetch from modifying LaunchDarkly requests.
+ */
 export const disableInterceptorsForLD = () => {
-  if (window.axios) {
+  if (window.axios && window.axios.interceptors) {
     window.axios.interceptors.request.use((config) => {
-      // Bypass LD endpoints
-      if (config.url.includes("launchdarkly.com")) {
-        config.headers = {}; // remove Authorization headers
+      if (config.url && config.url.includes("launchdarkly.com")) {
+        config.headers = {}; // remove MSAL auth headers
       }
       return config;
     });
   }
 
-  // Example: if your app overrides fetch globally, bypass for LD
+  // If your app overrides fetch globally, restore the native one for LD
   if (!window._originalFetch) {
     window._originalFetch = window.fetch;
     window.fetch = (url, options) => {
       if (typeof url === "string" && url.includes("launchdarkly.com")) {
-        // Call original fetch directly for LD
         return window._originalFetch(url, options);
       }
-      // otherwise your normal fetch flow
       return window._originalFetch(url, options);
     };
   }
 };
 
-// initialize LD after login
+/**
+ * Initialize LaunchDarkly after user login
+ */
 export const initLaunchDarkly = async (userEmail) => {
   disableInterceptorsForLD();
 
-  const client = initialize("YOUR_CLIENT_SIDE_ID", {
-    key: userEmail,
+  const ldClient = initialize("YOUR_CLIENT_SIDE_ID", {
+    key: userEmail || "anonymous-user",
   });
 
-  await client.waitForInitialization();
-  console.log("✅ LaunchDarkly Initialized Successfully");
-  return client;
+  await ldClient.waitForInitialization();
+  console.log("✅ LaunchDarkly initialized safely!");
+  return ldClient;
 };
 
-3️⃣ Use Inside App.js (after MSAL login)
+4️⃣ App.js — Initialize After MSAL Login
 
-Here’s how you integrate after user login — this ensures LD initializes only after authentication.
+In old MSAL React (v1.0.1), you don’t have hooks like useMsal() in the same form as new versions —
+so you usually initialize LD manually after you confirm login success.
 
-// App.js
+// src/App.js
 import React, { useEffect, useState } from "react";
-import { MsalProvider, useMsal } from "@azure/msal-react";
+import { MsalProvider } from "@azure/msal-react";
 import { msalInstance } from "./msalInstance";
 import { initLaunchDarkly } from "./LaunchDarklyClient";
 
 function AppContent() {
-  const { instance, accounts } = useMsal();
+  const [userEmail, setUserEmail] = useState(null);
   const [ldClient, setLdClient] = useState(null);
 
   useEffect(() => {
-    const initializeLD = async () => {
-      if (accounts.length > 0) {
-        const userEmail = accounts[0].username;
-        const client = await initLaunchDarkly(userEmail);
-        setLdClient(client);
-      } else {
-        // trigger login
-        instance.loginPopup().catch(console.error);
+    const initialize = async () => {
+      const accounts = msalInstance.getAllAccounts();
+
+      if (accounts.length === 0) {
+        // user not logged in
+        await msalInstance.loginPopup({
+          scopes: ["User.Read"],
+        });
       }
+
+      const account = msalInstance.getAllAccounts()[0];
+      setUserEmail(account.username);
+
+      // ✅ initialize LD only after login success
+      const client = await initLaunchDarkly(account.username);
+      setLdClient(client);
     };
-    initializeLD();
-  }, [accounts, instance]);
+
+    initialize().catch(console.error);
+  }, []);
 
   return (
     <div>
-      <h1>React + MSAL + LaunchDarkly</h1>
+      <h2>React + MSAL + LaunchDarkly (CORS Safe)</h2>
       {ldClient ? (
-        <p>LaunchDarkly Initialized ✅</p>
+        <p>LaunchDarkly initialized for {userEmail}</p>
       ) : (
         <p>Initializing LaunchDarkly...</p>
       )}
@@ -117,33 +122,24 @@ export default function App() {
   );
 }
 
-4️⃣ Where CORS Would Normally Fail
+5️⃣ Common Pitfalls That Cause CORS with Old MSAL
+Issue	Example	Fix
+Global Axios interceptors	Adds Authorization header to all requests	Skip launchdarkly.com URLs
+MSAL login triggers before LD ready	LD calls start while redirect/login pending	Wait until getAllAccounts().length > 0
+Proxy in package.json	"proxy": "http://your-api"	Don’t proxy LD domains
+AppInsights / telemetry wrapping fetch	Global fetch gets credentials: include	Patch window.fetch as shown
+✅ Test it Quickly
 
-If you accidentally do this 👇
+Run your app → open DevTools → Network
 
-axios.interceptors.request.use((config) => {
-  config.headers.Authorization = `Bearer ${token}`; // ❌ adds token to all requests
-  return config;
-});
+Filter by clientstream.launchdarkly.com
 
+You should see:
 
-or initialize LD before login:
+No Authorization header
 
-// ❌ Wrong place — LD runs before MSAL finishes login
-const client = initialize("LD_KEY", { key: "anonymous" });
+No preflight CORS error
 
+Status 200 ✅
 
-you’ll get:
-
-Access to fetch at 'https://clientstream.launchdarkly.com' from origin 'http://localhost:3000' 
-has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header
-
-✅ Final Checklist
-Step	Purpose	Where to Put
-Disable interceptors for LD	Prevent unwanted headers	LaunchDarklyClient.js
-Initialize LD after login	Ensure MSAL done	AppContent useEffect
-Keep proxy clear	Avoid LD requests being redirected	package.json
-Don’t modify LD URLs	Let them call official endpoints	N/A
-
-Would you like me to include an example using Axios global interceptor and AppInsights together (since many MSAL apps use both)?
-That version shows exactly how to exclude LD from both.
+If you see CORS again, check if another SDK (AppInsights, Datadog, etc.) is modifying fetch — we can exclude LD from those as well.
