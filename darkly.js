@@ -1,145 +1,106 @@
-1️⃣ msalConfig.js
-// src/authConfig.js
-export const msalConfig = {
-  auth: {
-    clientId: "YOUR_MSAL_CLIENT_ID",
-    authority: "https://login.microsoftonline.com/YOUR_TENANT_ID",
-    redirectUri: "http://localhost:3000",
-  },
-  cache: {
-    cacheLocation: "sessionStorage", // or "localStorage"
-  },
-};
+✅ Targeted Fix Plan (realistic & quick)
+Step 1 – Disable everything that might wrap fetch
 
-2️⃣ msalInstance.js
-// src/msalInstance.js
-import { PublicClientApplication } from "@azure/msal-browser";
-import { msalConfig } from "./authConfig";
+At the very top of src/index.js (before any imports):
 
-export const msalInstance = new PublicClientApplication(msalConfig);
-
-3️⃣ LaunchDarklyClient.js — CORS-Safe Setup
-
-This ensures LaunchDarkly SDK is initialized cleanly and not affected by MSAL or interceptors.
-
-// src/LaunchDarklyClient.js
-import { initialize } from "launchdarkly-js-client-sdk";
-
-/**
- * Prevent Axios or custom fetch from modifying LaunchDarkly requests.
- */
-export const disableInterceptorsForLD = () => {
-  if (window.axios && window.axios.interceptors) {
-    window.axios.interceptors.request.use((config) => {
-      if (config.url && config.url.includes("launchdarkly.com")) {
-        config.headers = {}; // remove MSAL auth headers
-      }
-      return config;
-    });
+// --- FIRST LINES OF index.js ---
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (url, options) => {
+  if (typeof url === "string" && url.includes("launchdarkly.com")) {
+    // always use untouched fetch for LaunchDarkly
+    return nativeFetch(url, options);
   }
+  return nativeFetch(url, options);
+};
 
-  // If your app overrides fetch globally, restore the native one for LD
-  if (!window._originalFetch) {
-    window._originalFetch = window.fetch;
-    window.fetch = (url, options) => {
-      if (typeof url === "string" && url.includes("launchdarkly.com")) {
-        return window._originalFetch(url, options);
-      }
-      return window._originalFetch(url, options);
-    };
+
+Then restart the app.
+If LD starts working → you’ve proven a global fetch wrapper (AppInsights or MSAL) was the blocker.
+
+Step 2 – Temporarily disable App Insights
+
+Comment out the initialization line:
+
+// import { ApplicationInsights } from '@microsoft/applicationinsights-web';
+// const appInsights = new ApplicationInsights({ config: { ... }});
+// appInsights.loadAppInsights();
+
+
+Run again.
+If it suddenly works → App Insights’ fetch auto-collection caused the issue.
+Permanent fix:
+
+new ApplicationInsights({
+  config: {
+    instrumentationKey: "KEY",
+    disableFetchTracking: true,  // 👈 important
+  },
+});
+
+Step 3 – Check axios / msal interceptors
+
+Search your codebase for:
+
+axios.interceptors.request.use(
+
+
+If you find one, wrap it like this:
+
+axios.interceptors.request.use((config) => {
+  if (config.url && config.url.includes("launchdarkly.com")) {
+    // skip token headers
+    return { ...config, headers: {} };
   }
-};
+  // your normal auth logic
+  return config;
+});
 
-/**
- * Initialize LaunchDarkly after user login
- */
-export const initLaunchDarkly = async (userEmail) => {
-  disableInterceptorsForLD();
+Step 4 – Ensure no proxy rerouting
 
-  const ldClient = initialize("YOUR_CLIENT_SIDE_ID", {
-    key: userEmail || "anonymous-user",
-  });
+Check:
 
-  await ldClient.waitForInitialization();
-  console.log("✅ LaunchDarkly initialized safely!");
-  return ldClient;
-};
+// package.json
+"proxy": "https://something.yourapi.com"
 
-4️⃣ App.js — Initialize After MSAL Login
 
-In old MSAL React (v1.0.1), you don’t have hooks like useMsal() in the same form as new versions —
-so you usually initialize LD manually after you confirm login success.
+➡ Remove that line or exclude LaunchDarkly in setupProxy.js:
 
-// src/App.js
-import React, { useEffect, useState } from "react";
-import { MsalProvider } from "@azure/msal-react";
-import { msalInstance } from "./msalInstance";
-import { initLaunchDarkly } from "./LaunchDarklyClient";
+if (req.url.includes('launchdarkly.com')) return next();
 
-function AppContent() {
-  const [userEmail, setUserEmail] = useState(null);
-  const [ldClient, setLdClient] = useState(null);
+Step 5 – Service-Worker check
 
-  useEffect(() => {
-    const initialize = async () => {
-      const accounts = msalInstance.getAllAccounts();
+If serviceWorkerRegistration.js exists and registers a worker, disable it during tests:
 
-      if (accounts.length === 0) {
-        // user not logged in
-        await msalInstance.loginPopup({
-          scopes: ["User.Read"],
-        });
-      }
+serviceWorkerRegistration.unregister();
 
-      const account = msalInstance.getAllAccounts()[0];
-      setUserEmail(account.username);
+🔁 Why this works
 
-      // ✅ initialize LD only after login success
-      const client = await initLaunchDarkly(account.username);
-      setLdClient(client);
-    };
+In your main app, a library is globally altering fetch to:
 
-    initialize().catch(console.error);
-  }, []);
+attach MSAL tokens, or
 
-  return (
-    <div>
-      <h2>React + MSAL + LaunchDarkly (CORS Safe)</h2>
-      {ldClient ? (
-        <p>LaunchDarkly initialized for {userEmail}</p>
-      ) : (
-        <p>Initializing LaunchDarkly...</p>
-      )}
-    </div>
-  );
-}
+set credentials: "include", or
 
-export default function App() {
-  return (
-    <MsalProvider instance={msalInstance}>
-      <AppContent />
-    </MsalProvider>
-  );
-}
+rewrite URLs through a proxy.
 
-5️⃣ Common Pitfalls That Cause CORS with Old MSAL
-Issue	Example	Fix
-Global Axios interceptors	Adds Authorization header to all requests	Skip launchdarkly.com URLs
-MSAL login triggers before LD ready	LD calls start while redirect/login pending	Wait until getAllAccounts().length > 0
-Proxy in package.json	"proxy": "http://your-api"	Don’t proxy LD domains
-AppInsights / telemetry wrapping fetch	Global fetch gets credentials: include	Patch window.fetch as shown
-✅ Test it Quickly
+LaunchDarkly requires pure anonymous fetches to its CDN endpoints.
+By restoring native fetch for launchdarkly.com, you completely bypass those global modifications.
 
-Run your app → open DevTools → Network
+✅ Quick sanity test
 
-Filter by clientstream.launchdarkly.com
+Run in DevTools console inside your broken app:
 
-You should see:
+fetch("https://clientstream.launchdarkly.com/health")
+  .then(r => r.status)
+  .catch(e => e.message);
 
-No Authorization header
 
-No preflight CORS error
+If that returns 200, your network is fine — confirming it’s just internal code interception.
 
-Status 200 ✅
+If you can share:
 
-If you see CORS again, check if another SDK (AppInsights, Datadog, etc.) is modifying fetch — we can exclude LD from those as well.
+whether you’re using AppInsights or axios interceptors (yes/no),
+
+and whether adding the native fetch patch fixed it,
+
+then I can show the exact permanent code change (not just patch) for your case.
